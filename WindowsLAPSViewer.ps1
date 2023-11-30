@@ -3,6 +3,8 @@
 #
 # Latest Version at "https://github.com/cnschindler/WindowsLapsViewer"
 #
+# Provided as is. No liabilty.
+#
 
 [cmdletbinding(SupportsShouldProcess = $true)]
 Param()
