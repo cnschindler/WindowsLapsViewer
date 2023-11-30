@@ -1,3 +1,9 @@
+#
+# WindowsLapsViewer by Christian Schindler, NTx BOCG, christian.schinder@ntx.at
+#
+# Latest Version at "https://github.com/cnschindler/WindowsLapsViewer"
+#
+
 [cmdletbinding(SupportsShouldProcess = $true)]
 Param()
 
