@@ -130,16 +130,20 @@ $bitmap.Freeze()
 $Form.Icon = $bitmap
 #endregion
 
+# Configure LAPS History Datagrid
 $Datagrid_LapsHistory.IsReadOnly = $true
 $Datagrid_LapsHistory.SelectionMode = "Single"
 $Datagrid_LapsHistory.SelectionUnit = "Cell"
 $Datagrid_LapsHistory.CanUserResizeColumns = $False
 $Datagrid_LapsHistory.HorizontalScrollBarVisibility = "Hidden"
 
+# Disable Retrieve Passwort Button by default
 $Button_RetrievePassword.IsEnabled = $false
 
+# Set Focus on the Computername Textbox
 $Textbox_Computername.Focus()
 
+# Handler for changed text in the Textbox
 $Textbox_Computername.Add_TextChanged(
     {
         $Textbox_Messages.Clear()
@@ -147,6 +151,8 @@ $Textbox_Computername.Add_TextChanged(
         $Button_RetrievePassword.IsEnabled = $true
     }
 )
+
+# Handler for Button click
 $Button_RetrievePassword.Add_Click(
     {
         $Textbox_Messages.Clear()
