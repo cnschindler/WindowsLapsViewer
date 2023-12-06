@@ -149,7 +149,7 @@ $Datagrid_LapsHistory.HorizontalScrollBarVisibility = "Hidden"
 $Button_RetrievePassword.IsEnabled = $false
 
 # Set Focus on the Computername Textbox
-$Textbox_Computername.Focus()
+$Textbox_Computername.Focus() | Out-Null
 
 # Handler for changed text in the Textbox
 $Textbox_Computername.Add_TextChanged(
@@ -197,7 +197,7 @@ $Button_RetrievePassword.Add_Click(
 )
 
 # Import Windows LAPS Module
-Manage-Modules -ModuleName LAPS
+Manage-Modules -ModuleName LAPS | Out-Null
 
 # Load Form
 $Form.ShowDialog() | Out-Null
