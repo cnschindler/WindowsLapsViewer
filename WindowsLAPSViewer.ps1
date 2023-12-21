@@ -31,7 +31,7 @@ Function Manage-Modules
         catch
         {
             $Textbox_Messages.Text = "LAPS Module could not be loaded. Error: $($Error.Exception.InnerException)"
-            $Button_RetrievePassword.Visibility = 0
+            $Button_RetrievePassword.Visibility = 1
         }
     }
 
