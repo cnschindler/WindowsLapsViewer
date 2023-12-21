@@ -169,6 +169,7 @@ $Textbox_Computername.Add_TextChanged(
 $Button_RetrievePassword.Add_Click(
     {
         $Textbox_Messages.Clear()
+        $Datagrid_LapsHistory.items.Clear()
         $Computername = $Textbox_Computername.Text
 
         if (-not $Computername)
@@ -204,7 +205,17 @@ $Button_RetrievePassword.Add_Click(
 # Handler for datagrid contextmenu
 $Datagrid_CopyContextMenu.Add_Click({
         $Item = $Datagrid_LapsHistory.CurrentItem
-        $item.Password | Set-Clipboard
+        try
+        {
+            $item.Password | Set-Clipboard -ErrorAction Stop
+            $Textbox_Messages.Text = "Password copied to clipboard"
+        }
+
+        Catch
+        {
+            $Textbox_Messages.Text = "Error copying password to clipboard. Error: $($Error.Exception.InnerException)"
+        }
+        
     }
 )
 
