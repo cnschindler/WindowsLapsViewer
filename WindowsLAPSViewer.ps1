@@ -96,7 +96,12 @@ Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.For
         <TextBox x:Name="Textbox_Lapspassword" HorizontalAlignment="Left" Height="20" Margin="20,85,0,0" VerticalAlignment="Top" Width="470" FontSize="12"/>
         <Label x:Name="Label_LapsHistory" Content="LAPS History entries" HorizontalAlignment="Left" Height="27" Margin="20,110,0,0" VerticalAlignment="Top" Width="137" FontWeight="Bold"/>
         <DataGrid x:Name="Datagrid_LapsHistory" Margin="20,135,0,0" AutoGenerateColumns="False" HorizontalAlignment="Left" VerticalAlignment="Top" Height="110" Width="470">
-            <DataGrid.Resources>
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Name="Datagrid_CopyContextMenu" Header="Copy"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+        <DataGrid.Resources>
                 <Style TargetType="DataGridCell">
                     <Setter Property="Margin" Value="0"/>
                     <Setter Property="Padding" Value="0"/>
@@ -194,6 +199,18 @@ $Button_RetrievePassword.Add_Click(
             }
         }
     }    
+)
+
+# Handler for datagrid contextmenu
+$Datagrid_CopyContextMenu.Add_Click({    
+        $rowIndex = $Datagrid_LapsHistory.CurrentRow.Index
+        $columnIndex = $Datagrid_LapsHistory.CurrentCell.ColumnIndex
+
+        Write-Host $rowIndex
+        Write-Host $columnIndex 
+        Write-Host $Datagrid_LapsHistory.Rows[$rowIndex].Cells[0].value
+        Write-Host $Datagrid_LapsHistory.Rows[$rowIndex].Cells[$columnIndex].value
+    }
 )
 
 # Import Windows LAPS Module
