@@ -30,14 +30,14 @@ Function Manage-Modules
         
         catch
         {
-            $Textbox_Messages.Text = "LAPS Module not installed. Please install first!"
-            $Button_RetrievePassword.Visibility = 1
+            $Textbox_Messages.Text = "LAPS Module could not be loaded. Error: $($Error.Exception.InnerException)"
+            $Button_RetrievePassword.Visibility = 0
         }
     }
 
     else
     {
-        $Textbox_Messages.Text = "LAPS Module could not be loaded. Error: $($_) "
+        $Textbox_Messages.Text = "LAPS Module not installed. Please install first!"
         $Button_RetrievePassword.Visibility = 1
     }
 }
