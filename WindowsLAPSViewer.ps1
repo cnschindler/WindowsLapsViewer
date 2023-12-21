@@ -169,6 +169,7 @@ $Textbox_Computername.Add_TextChanged(
 $Button_RetrievePassword.Add_Click(
     {
         $Textbox_Messages.Clear()
+        $Datagrid_LapsHistory.items.Clear()
         $Computername = $Textbox_Computername.Text
 
         if (-not $Computername)
