@@ -202,14 +202,9 @@ $Button_RetrievePassword.Add_Click(
 )
 
 # Handler for datagrid contextmenu
-$Datagrid_CopyContextMenu.Add_Click({    
-        $rowIndex = $Datagrid_LapsHistory.CurrentRow.Index
-        $columnIndex = $Datagrid_LapsHistory.CurrentCell.ColumnIndex
-
-        Write-Host $rowIndex
-        Write-Host $columnIndex 
-        Write-Host $Datagrid_LapsHistory.Rows[$rowIndex].Cells[0].value
-        Write-Host $Datagrid_LapsHistory.Rows[$rowIndex].Cells[$columnIndex].value
+$Datagrid_CopyContextMenu.Add_Click({
+        $Item = $Datagrid_LapsHistory.CurrentItem
+        $item.Password | Set-Clipboard
     }
 )
 
