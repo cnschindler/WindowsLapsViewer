@@ -9,6 +9,152 @@
 [cmdletbinding(SupportsShouldProcess = $true)]
 Param()
 
+
+$ScriptParentPath = Split-Path -Path $MyInvocation.MyCommand.Path -Parent
+$ScriptModulePath = Join-Path -Path $ScriptParentPath -ChildPath "Modules"
+
+#Region Logging
+[string]$Script:LogFileNamePrefix = "NTxWindowsLapsViewer"
+[string]$Script:LogfileName = ($LogFileNamePrefix + "_{0:yyyyMMdd-HHmmss}.log" -f [DateTime]::Now)
+[string]$Script:LogPath = $ScriptParentPath
+[string]$script:LogFilePath = Join-Path -Path $Script:LogPath -ChildPath $Script:LogfileName    
+[string]$Script:LogFileStart = "Logging started"
+[string]$Script:LogFileStop = "Logging stopped"
+$Script:NoLogging = $true
+#EndRegion Logging
+
+function Write-LogFile
+{
+    # Logging function, used for progress and error logging...
+    # Uses the globally (script scoped) configured variables 'LogFilePath' to identify the logfile and 'NoLogging' to disable it.
+    #
+    [CmdLetBinding()]
+
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+        [Parameter(Mandatory = $false)]
+        [string]$LogPrefix,
+        [System.Management.Automation.ErrorRecord]$ErrorInfo = $null
+    )
+
+    # Prefix the string to write with the current Date and Time, add error message if present...
+    if ($ErrorInfo)
+    {
+        $logLine = "{0:d.M.y H:mm:ss} : {1}: {2} Error: {3}" -f [DateTime]::Now, $LogPrefix, $Message, $ErrorInfo.Exception.Message
+    }
+
+    Else
+    {
+        $logLine = "{0:d.M.y H:mm:ss} : {1}: {2}" -f [DateTime]::Now, $LogPrefix, $Message
+    }
+
+    if (-not $NoLogging)
+    {
+        # Create the Script:Logfile and folder structure if it doesn't exist
+        if (-not (Test-Path $Script:LogFilePath -PathType Leaf))
+        {
+            New-Item -ItemType File -Path $Script:LogFilePath -Force -Confirm:$false -WhatIf:$false | Out-Null
+            #Add-Content -Value "Logging started." -Path $Script:LogFilePath -Encoding UTF8 -WhatIf:$false -Confirm:$false
+        }
+
+        # Write to the Script:Logfile
+        Add-Content -Value $logLine -Path $Script:LogFilePath -Encoding UTF8 -WhatIf:$false -Confirm:$false
+        Write-Verbose $logLine
+    }
+    
+    Else
+    {
+        Write-Host $logLine
+    }
+}
+
+Function ManageModuleAndSnapInLoading
+{
+    # Function to check for and import modules
+
+    Param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [switch]$Snapin,
+        [switch]$IsFile
+    )
+
+    if ($Snapin)
+    {
+        if ((Get-PSSnapin $Name -Registered -ErrorAction SilentlyContinue))
+        {
+            try
+            {
+                Add-PSSnapin -Name $Name -ErrorAction Stop
+                Write-LogFile -Message "$($Name)$($LoadSnapinSuccess)"
+            }
+            
+            catch
+            {
+                Write-LogFile -Message "$($LoadSnapinError)$($Name)." -ErrorInfo $_
+            }
+        }
+
+        Else
+        {
+            Write-LogFile -Message "$($EX_RecipientMGMTSnapin_NotInstalled)"
+        }
+    }
+
+    Else
+    {
+        $IsModuleInstalled = (Get-Module -ListAvailable -Name $Name | Sort-Object Version -Descending | Select-Object -First 1)
+    
+        if ($IsFile)
+        {
+            [System.IO.FileInfo]$Filename = $Name
+            $MatchedName = $Filename.Name.Replace(".psm1", "")
+        }
+
+        Else
+        {
+            $MatchedName = $Name
+        }
+
+        if ($IsModuleInstalled.Name -match "$($MatchedName)")
+        {   
+            try
+            {
+                Import-Module -Name $Name -ErrorAction Stop -WarningAction SilentlyContinue -DisableNameChecking
+                Write-LogFile -Message "$($Name)$($LoadModuleSuccess)"
+            }
+            
+            catch
+            {
+                Write-LogFile -Message "$($LoadModuleError)$($Name)." -ErrorInfo $_
+            }
+        }
+    
+        Else
+        {
+            Write-LogFile = "$($Name)$($ModuleNotInstalled)."
+            Break
+        }    
+    }
+}
+function LoadFileBasedModules
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [System.IO.DirectoryInfo]
+        $Path
+    )
+
+    $ModuleFiles = Get-ChildItem -Path $Path -Recurse -Filter "*.psm1"
+
+    foreach ($File in $ModuleFiles)
+    {
+        ManageModuleAndSnapInLoading -Name $file.Fullname -IsFile
+    }
+}
 Function Manage-Modules
 {
     # Function to check for and import modules
@@ -41,7 +187,6 @@ Function Manage-Modules
         $Button_RetrievePassword.Visibility = 1
     }
 }
-
 function Get-LAPSClearTextPassword
 {
     [cmdletbinding()]
@@ -73,6 +218,25 @@ function Get-LAPSClearTextPassword
     }
 }
 
+function Get-ObjectPickerSelection
+{
+    
+        $Attributes = "SamAccountName"
+        $AllowedObjectTypes = "Computers"        
+
+    $ReturnObject = Show-ActiveDirectoryObjectPicker -AttributesToFetch $Attributes -AllowedObjectTypes $AllowedObjectTypes
+    if ($ReturnObject.Name -match ".")
+    {
+        Return $ReturnObject            
+    }
+
+    else
+    {
+        Show-MessageBox -BoxTitle $MSGBoxTitleInvalidSelection -BoxMessageText  $MessageNoObjectSelected -BoxIcon $MSGBoxWarn -Buttons $MSGBoxOK    
+    }
+ 
+}
+
 #Region XAML Form
 Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.Forms, WindowsFormsIntegration
 
@@ -86,11 +250,26 @@ Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.For
         xmlns:local="clr-namespace:WindowsLapsViewer"
         mc:Ignorable="d"
         Title="NTx Windows Active Directory LAPS Viewer" Width="530" MinWidth="530" MinHeight="380" ResizeMode="NoResize" ScrollViewer.VerticalScrollBarVisibility="Disabled" SizeToContent="Height">
+    <Window.Resources>
+        <Style x:Key="Datagrid" TargetType="{x:Type DataGrid}">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="Cell"/>
+            <Setter Property="CanUserResizeColumns" Value="False"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Hidden"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+        </Style>
+    </Window.Resources>
     <Grid VerticalAlignment="Top" HorizontalAlignment="Left" Width="530" Height="380">
         <Label x:Name="Label_Computername" Content="Computername" HorizontalAlignment="Left" Margin="20,10,0,0" VerticalAlignment="Top" Width="99" FontWeight="Bold"/>
         <TextBox x:Name="Textbox_Computername" HorizontalAlignment="Left" Height="20" Margin="20,35,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="255" TabIndex="1" FontSize="12"/>
-        <Button x:Name="Button_RetrievePassword" HorizontalAlignment="Left" Height="40" Margin="290,25,0,0" VerticalAlignment="Top" Width="80">
+        <Button x:Name="Button_RetrievePassword" HorizontalAlignment="Right" Height="40" Margin="0,25,60,0" VerticalAlignment="Top" Width="80">
             <AccessText Text="Retrieve Passwords" TextWrapping="Wrap" TextAlignment="Center"/>
+        </Button>
+        <Button x:Name="Button_SelectComputer" HorizontalAlignment="Left" Height="40" Margin="290,25,0,0" VerticalAlignment="Top" Width="80">
+            <AccessText Text="Select Computer..." TextWrapping="Wrap" TextAlignment="Center"/>
         </Button>
         <Label x:Name="Label_LapsPassword" Content="Current LAPS Password" HorizontalAlignment="Left" Height="27" Margin="20,60,0,0" VerticalAlignment="Top" Width="150" FontWeight="Bold"/>
         <TextBox x:Name="Textbox_Lapspassword" HorizontalAlignment="Left" Height="20" Margin="20,85,0,0" VerticalAlignment="Top" Width="470" FontSize="12"/>
@@ -101,7 +280,7 @@ Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.For
                     <MenuItem Name="Datagrid_CopyContextMenu" Header="Copy"/>
                 </ContextMenu>
             </DataGrid.ContextMenu>
-        <DataGrid.Resources>
+            <DataGrid.Resources>
                 <Style TargetType="DataGridCell">
                     <Setter Property="Margin" Value="0"/>
                     <Setter Property="Padding" Value="0"/>
@@ -109,7 +288,7 @@ Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.For
                 </Style>
             </DataGrid.Resources>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Password" Binding="{Binding Password}" Width="390" />
+                <DataGridTextColumn Header="Password" Binding="{Binding Password}" Width="405" />
                 <DataGridTextColumn Header="Date Set" Binding="{Binding PasswordUpdateTime}" Width="80" />
             </DataGrid.Columns>
         </DataGrid>
@@ -149,6 +328,9 @@ $Datagrid_LapsHistory.SelectionMode = "Single"
 $Datagrid_LapsHistory.SelectionUnit = "Cell"
 $Datagrid_LapsHistory.CanUserResizeColumns = $False
 $Datagrid_LapsHistory.HorizontalScrollBarVisibility = "Hidden"
+$Datagrid_LapsHistory.HeadersVisibility = "Column"
+$Datagrid_LapsHistory.GridLinesVisibility = "None"
+$Datagrid_LapsHistory.Background = "White"
 
 # Disable Retrieve Passwort Button by default
 $Button_RetrievePassword.IsEnabled = $false
@@ -165,7 +347,7 @@ $Textbox_Computername.Add_TextChanged(
     }
 )
 
-# Handler for Button click
+# Handler for Retrieve Password Button click
 $Button_RetrievePassword.Add_Click(
     {
         $Textbox_Messages.Clear()
@@ -202,6 +384,17 @@ $Button_RetrievePassword.Add_Click(
     }    
 )
 
+# Handler for Select Computer Button click
+$Button_SelectComputer.Add_Click(
+    {
+        $Computer = Get-ObjectPickerSelection
+        if ($Computer.Name -match ".")
+        {
+            $Textbox_Computername.Text = $Computer.FetchedAttributes[0]
+        }
+    }
+)
+
 # Handler for datagrid contextmenu
 $Datagrid_CopyContextMenu.Add_Click({
         $Item = $Datagrid_LapsHistory.CurrentItem
@@ -220,7 +413,9 @@ $Datagrid_CopyContextMenu.Add_Click({
 )
 
 # Import Windows LAPS Module
-Manage-Modules -ModuleName LAPS | Out-Null
+ManageModuleAndSnapInLoading -Name ActiveDirectory | Out-Null
+#Manage-Modules -ModuleName LAPS | Out-Null
+LoadFileBasedModules -Path $ScriptModulePath
 
 # Load Form
 $Form.ShowDialog() | Out-Null
